@@ -71,12 +71,38 @@ class Generator(nn.Module):
 class Discriminator(nn.Module):
 
     # Initialize the Discriminator
-    def __init__(self, params):
+    def __init__(self):
         super(Discriminator, self).__init__()
+
+        ##Discriminator Architecture##
+        self.conv1 = nn.Conv2d(
+            in_channels=3, out_channels=64, kernel_size=4, stride=2, padding=1)
+
+        self.conv2 = nn.Conv2d(
+            in_channels=64, out_channels=128, kernel_size=4, stride=2, padding=1)
+        self.conv2_in = nn.InstanceNorm2d(128)
+
+        self.conv3 = nn.Conv2d(
+            in_channels=128, out_channels=256, kernel_size=4, stride=2, padding=1)
+        self.conv3_in = nn.InstanceNorm2d(256)
+
+        self.conv4 = nn.Conv2d(
+            in_channels=256, out_channels=512, kernel_size=4, stride=1, padding=1)
+        self.conv4_in = nn.InstanceNorm2d(512)
+
+        self.final_conv = nn.Conv2d(
+            in_channels=512, out_channels=1, kernel_size=4, stride=1, padding=1)
 
     # Forward pass
     def forward(self, input_sample):
-        pass
+
+        x = F.leaky_relu_(self.conv1(input_sample), negative_slope=0.2)
+        x = F.leaky_relu(self.conv2_in(self.conv2(x)), negative_slope=0.2)
+        x = F.leaky_relu(self.conv3_in(self.conv3(x)), negative_slope=0.2)
+        x = F.leaky_relu(self.conv4_in(self.conv4(x)), negative_slope=0.2)
+        x = self.final_conv(x)
+        # Average pooling
+        return F.avg_pool2d(x, kernel_size=30)
 
 
 class ResidualBlock(nn.Module):
