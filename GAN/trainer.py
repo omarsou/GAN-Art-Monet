@@ -1,9 +1,10 @@
 # File where we build the trainer
 import torch
 from torch.autograd import Variable
-
+from torchvision.utils import save_image
 
 # Class that handle the training of the cycle GAN
+
 
 class Trainer():
 
@@ -117,3 +118,8 @@ class Trainer():
                 self.dis_b_optim.step()
 
                 print('Gen Loss: {} Dis Loss: {}'.format(L_g, L_D))
+
+                save_image(torch.cat((data_A, fake_AB), dim=3),
+                           'log/img{}_AB.png'.format(i))
+                save_image(torch.cat((data_B, fake_BA), dim=3),
+                           'log/img{}_BA.png'.format(i))
