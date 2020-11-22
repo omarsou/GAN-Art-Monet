@@ -102,7 +102,7 @@ class Discriminator(nn.Module):
         x = F.leaky_relu(self.conv4_in(self.conv4(x)), negative_slope=0.2)
         x = self.final_conv(x)
         # Average pooling
-        return F.avg_pool2d(x, kernel_size=30)
+        return torch.reshape(F.avg_pool2d(x, kernel_size=30), (1,))
 
 
 class ResidualBlock(nn.Module):
@@ -113,7 +113,6 @@ class ResidualBlock(nn.Module):
 
     conv1 = nn.Conv2d(in_channels=256, out_channels=256,
                       kernel_size=3, stride=1, padding=1)
-
     conv1_bn = nn.BatchNorm2d(256)
 
     conv2 = nn.Conv2d(in_channels=256, out_channels=256,
