@@ -14,10 +14,8 @@ class Trainer():
         generator_ba,
         discriminator_a,
         discriminator_b,
-        generator_ab_optimizer,
-        generator_ba_optimizer,
-        discriminator_a_optimizer,
-        discriminator_b_optimizer,
+        generator_optimizer,
+        discriminator_optimizer,
         n_epochs,
         dataloader,
         device,
@@ -27,10 +25,8 @@ class Trainer():
         self.gen_ba = generator_ba
         self.dis_a = discriminator_a
         self.dis_b = discriminator_b
-        self.gen_ab_optim = generator_ab_optimizer
-        self.gen_ba_optim = generator_ba_optimizer
-        self.dis_a_optim = discriminator_a_optimizer
-        self.dis_b_optim = discriminator_b_optimizer
+        self.gen_optim = generator_optimizer
+        self.dis_optim = discriminator_optimizer
         self.dataloader = dataloader
         self.n_epochs = n_epochs
         self.device = device
@@ -52,13 +48,12 @@ class Trainer():
                 print(i)
 
                 # Sample from the image folder
-                data_A = Variable(data[1]).to(self.device)  # Painting
-                data_B = Variable(data[0]).to(self.device)  # Image
+                data_A = Variable(data[0]).to(self.device)  # Painting
+                data_B = Variable(data[1]).to(self.device)  # Image
 
                 # Train Generator
 
-                self.gen_ab_optim.zero_grad()
-                self.gen_ba_optim.zero_grad()
+                self.gen_optim.zero_grad()
 
                 # 1st loss: identity
                 fake_AA = self.gen_ba(data_A)
@@ -83,17 +78,15 @@ class Trainer():
                 dp_loss_BAB = self.double_pass_loss(fake_BAB, data_B)
 
                 # Final loss
-                L_g = id_loss_A + id_loss_B + disc_loss_AB + \
-                    disc_loss_BA + dp_loss_ABA + dp_loss_BAB
+                L_g = 5*id_loss_A + 5*id_loss_B + disc_loss_AB + \
+                    disc_loss_BA + 10*dp_loss_ABA + 10*dp_loss_BAB
                 L_g.backward()
 
-                self.gen_ab_optim.step()
-                self.gen_ba_optim.step()
+                self.gen_optim.step()
 
                 # Train Discriminator
 
-                self.dis_a_optim.zero_grad()
-                self.dis_b_optim.zero_grad()
+                self.dis_optim.zero_grad()
 
                 # Sample prediction
 
@@ -111,15 +104,15 @@ class Trainer():
                 fake_loss_A = self.discriminator_loss(fake_prediction_A, zero)
                 fake_loss_B = self.discriminator_loss(fake_prediction_B, zero)
 
-                L_D = real_loss_A + real_loss_B + fake_loss_A + fake_loss_B
+                L_D = (real_loss_A + real_loss_B +
+                       fake_loss_A + fake_loss_B)*0.5
                 L_D.backward()
 
-                self.dis_a_optim.step()
-                self.dis_b_optim.step()
+                self.dis_optim.step()
 
                 print('Gen Loss: {} Dis Loss: {}'.format(L_g, L_D))
 
-                save_image(torch.cat((data_A, fake_AB), dim=3),
+                save_image(torch.cat(((data_A*0.5)+0.5, (fake_AB*0.5)+0.5), dim=3),
                            'log/img{}_AB.png'.format(i))
-                save_image(torch.cat((data_B, fake_BA), dim=3),
+                save_image(torch.cat(((data_B*0.5)+0.5, (fake_BA*0.5)+0.5), dim=3),
                            'log/img{}_BA.png'.format(i))

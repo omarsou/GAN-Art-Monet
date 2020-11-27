@@ -11,8 +11,10 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
 
         ## Architecture of the Generator ##
+
+        self.rp1 = nn.ReflectionPad2d(3)
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=64,
-                               kernel_size=7, stride=1, padding=3)
+                               kernel_size=7, stride=1)
         self.conv1_in = nn.InstanceNorm2d(64)
         self.conv2 = nn.Conv2d(in_channels=64, out_channels=128,
                                kernel_size=3, stride=2, padding=1)
@@ -39,18 +41,21 @@ class Generator(nn.Module):
             in_channels=128, out_channels=64, kernel_size=3, stride=2, padding=1, output_padding=1)
         self.tconv2_in = nn.InstanceNorm2d(64)
 
+        self.rp_final = nn.ReflectionPad2d(3)
         self.conv_final = nn.Conv2d(
-            in_channels=64, out_channels=3, kernel_size=7, stride=1, padding=3)
+            in_channels=64, out_channels=3, kernel_size=7, stride=1)
+
+        self.activation = nn.Tanh()
 
     # Forward Pass
 
     def forward(self, input_sample):
 
-        x = F.relu(self.conv1_in(self.conv1(input_sample)))
-        x = F.relu(self.conv2_in(self.conv2(x)))
-        x = F.relu(self.conv3_in(self.conv3(x)))
+        x1 = F.relu(self.conv1_in(self.conv1(self.rp1(input_sample))))
+        x2 = F.relu(self.conv2_in(self.conv2(x1)))
+        x3 = F.relu(self.conv3_in(self.conv3(x2)))
 
-        x = self.residual_block_1(x)
+        x = self.residual_block_1(x3)
         x = self.residual_block_2(x)
         x = self.residual_block_3(x)
         x = self.residual_block_4(x)
@@ -60,11 +65,10 @@ class Generator(nn.Module):
         x = self.residual_block_8(x)
         x = self.residual_block_9(x)
 
-        x = F.relu(self.tconv1_in(self.tconv1(x)))
-        x = F.relu(self.tconv2_in(self.tconv2(x)))
+        x = F.relu(self.tconv1_in(self.tconv1(x+x3)))
+        x = F.relu(self.tconv2_in(self.tconv2(x+x2)))
 
-        x = F.tanh(self.conv_final(x))
-
+        x = self.activation(self.conv_final(self.rp_final(x+x1)))
         return x
 
 
@@ -111,16 +115,27 @@ class ResidualBlock(nn.Module):
     def __init__(self):
         super(ResidualBlock, self).__init__()
 
-    conv1 = nn.Conv2d(in_channels=256, out_channels=256,
-                      kernel_size=3, stride=1, padding=1)
-    conv1_bn = nn.BatchNorm2d(256)
+        self.conv1 = nn.Conv2d(in_channels=256, out_channels=256,
+                               kernel_size=3, stride=1, padding=1)
+        self.conv1_bn = nn.InstanceNorm2d(256)
 
-    conv2 = nn.Conv2d(in_channels=256, out_channels=256,
-                      kernel_size=3, stride=1, padding=1)
-    conv2_bn = nn.BatchNorm2d(256)
+        self.conv2 = nn.Conv2d(in_channels=256, out_channels=256,
+                               kernel_size=3, stride=1, padding=1)
+        self.conv2_bn = nn.InstanceNorm2d(256)
+
+        self.conv_block = nn.Sequential(
+            *[self.conv1, self.conv1_bn, nn.ReLU(inplace=True), self.conv2, self.conv2_bn])
 
     # Forward pass
+
     def forward(self, input_sample):
-        x = F.relu(self.conv1_bn(self.conv1(input_sample)))
-        x = self.conv2_bn(self.conv2(x))
-        return x+input_sample
+        return self.conv_block(input_sample) + input_sample
+
+
+def weights_init_normal(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        torch.nn.init.normal(m.weight.data, 0.0, 0.02)
+    elif classname.find('BatchNorm2d') != -1:
+        torch.nn.init.normal(m.weight.data, 1.0, 0.02)
+        torch.nn.init.constant(m.bias.data, 0.0)

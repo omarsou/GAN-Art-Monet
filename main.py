@@ -2,9 +2,10 @@
 
 import torch
 import numpy as np
-from GAN.model import Generator, Discriminator
+from GAN.model import Generator, Discriminator, weights_init_normal
 from GAN.trainer import Trainer
-from GAN.data_read import get_data_loader
+from GAN.data_read import get_data_loader, get_data_loader2
+import itertools
 
 
 def main():
@@ -24,12 +25,18 @@ def main():
     discriminator_A = Discriminator().to(device)
     discriminator_B = Discriminator().to(device)
 
-    # Set optimizers
-    G_AB_optimizer = torch.optim.Adam(generator_AB.parameters(), lr=2e-4)
-    G_BA_optimizer = torch.optim.Adam(generator_BA.parameters(), lr=2e-4)
+    generator_AB.apply(weights_init_normal)
+    generator_BA.apply(weights_init_normal)
+    discriminator_A.apply(weights_init_normal)
+    discriminator_B.apply(weights_init_normal)
 
-    D_A_optimizer = torch.optim.Adam(discriminator_A.parameters(), lr=2e-4)
-    D_B_optimizer = torch.optim.Adam(discriminator_B.parameters(), lr=2e-4)
+    # Set optimizers
+
+    G_optimizer = torch.optim.Adam(itertools.chain(
+        generator_AB.parameters(), generator_BA.parameters()), lr=2e-4)
+
+    D_optimizer = torch.optim.Adam(itertools.chain(
+        discriminator_A.parameters(), discriminator_B.parameters()), lr=2e-4)
 
     # Set trainer
     trainer = Trainer(
@@ -37,10 +44,8 @@ def main():
         generator_ba=generator_BA,
         discriminator_a=discriminator_A,
         discriminator_b=discriminator_B,
-        generator_ab_optimizer=G_AB_optimizer,
-        generator_ba_optimizer=G_BA_optimizer,
-        discriminator_a_optimizer=D_A_optimizer,
-        discriminator_b_optimizer=D_B_optimizer,
+        generator_optimizer=G_optimizer,
+        discriminator_optimizer=D_optimizer,
         n_epochs=n_epochs,
         dataloader=dataset,
         device=device,
