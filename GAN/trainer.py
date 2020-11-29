@@ -96,7 +96,7 @@ class Trainer():
                 self.gen_optim.step()
 
                 # --------------------------------Print option
-                if i % 100 == 0:
+                if i == 100:
 
                     self.log.plot_img(
                         c_epoch,
