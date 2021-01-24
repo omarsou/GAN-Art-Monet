@@ -73,7 +73,8 @@ def get_data_loader(path_monnet, path_pictures, batch_size, shuffle=True):
 
     # Transform images as tensors
     transformation = transforms.Compose([
-        transforms.ToTensor()
+        transforms.ToTensor(),
+        transforms.RandomHorizontalFlip(p=0.5),
     ])
 
     # Image folder dataset
@@ -97,7 +98,8 @@ def get_data_loader2(path_monnet, path_pictures, batch_size, shuffle=True):
 
     # Transform images as tensors
     transformation = transforms.Compose([
-        transforms.ToTensor()
+        transforms.ToTensor(),
+        transforms.RandomHorizontalFlip(p=0.5),
     ])
 
     # Image folder dataset

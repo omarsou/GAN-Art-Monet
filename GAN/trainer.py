@@ -3,7 +3,6 @@ import torch
 from torch.autograd import Variable
 from torchvision.utils import save_image
 import random
-from .model import ReplayBuffer
 from .logs import Log
 
 # Class that handle the training of the cycle GAN
@@ -43,10 +42,6 @@ class Trainer():
 
     def train(self):
 
-        # Avoid cyclic optimization
-        fake_BA_buffer = ReplayBuffer()
-        fake_AB_buffer = ReplayBuffer()
-
         for c_epoch in range(self.n_epochs):
 
             one = Variable(torch.ones(1), requires_grad=False).to(self.device)
@@ -56,14 +51,11 @@ class Trainer():
 
             for i, data in enumerate(self.dataloader):
 
-                print(i)
-
                 # Sample from the image folder
                 data_A = Variable(data[0]).to(self.device)  # Painting
                 data_B = Variable(data[1]).to(self.device)  # Image
 
                 # -------------------------------------Train Generator
-
                 self.gen_optim.zero_grad()
 
                 # 1st loss: identity
@@ -95,28 +87,10 @@ class Trainer():
 
                 self.gen_optim.step()
 
-                # --------------------------------Print option
-                if i == 100:
-
-                    self.log.plot_img(
-                        c_epoch,
-                        data_A,
-                        data_B,
-                        fake_AB,
-                        fake_AA,
-                        fake_BA,
-                        fake_BB
-                    )
-
                 # ------------------------------------ Train Discriminator
-
                 self.dis_optim.zero_grad()
 
                 # Sample prediction
-
-                fake_AB = fake_AB_buffer.push_and_pop(fake_AB)
-                fake_BA = fake_BA_buffer.push_and_pop(fake_BA)
-
                 real_prediction_A = self.dis_a(data_A)
                 real_loss_A = self.discriminator_loss(real_prediction_A, one)
 
@@ -124,7 +98,6 @@ class Trainer():
                 real_loss_B = self.discriminator_loss(real_prediction_B, one)
 
                 # Fake prediction
-
                 fake_prediction_A = self.dis_a(fake_BA.detach())
                 fake_prediction_B = self.dis_b(fake_AB.detach())
 
