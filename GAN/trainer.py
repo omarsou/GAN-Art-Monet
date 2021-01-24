@@ -2,6 +2,8 @@
 import torch
 from torch.autograd import Variable
 from torchvision.utils import save_image
+import random
+from .logs import Log
 
 # Class that handle the training of the cycle GAN
 
@@ -14,10 +16,8 @@ class Trainer():
         generator_ba,
         discriminator_a,
         discriminator_b,
-        generator_ab_optimizer,
-        generator_ba_optimizer,
-        discriminator_a_optimizer,
-        discriminator_b_optimizer,
+        generator_optimizer,
+        discriminator_optimizer,
         n_epochs,
         dataloader,
         device,
@@ -27,10 +27,8 @@ class Trainer():
         self.gen_ba = generator_ba
         self.dis_a = discriminator_a
         self.dis_b = discriminator_b
-        self.gen_ab_optim = generator_ab_optimizer
-        self.gen_ba_optim = generator_ba_optimizer
-        self.dis_a_optim = discriminator_a_optimizer
-        self.dis_b_optim = discriminator_b_optimizer
+        self.gen_optim = generator_optimizer
+        self.dis_optim = discriminator_optimizer
         self.dataloader = dataloader
         self.n_epochs = n_epochs
         self.device = device
@@ -39,26 +37,26 @@ class Trainer():
         self.discriminator_loss = torch.nn.MSELoss()
         self.double_pass_loss = torch.nn.L1Loss()
 
+        # Log class to keep track of losses
+        self.log = Log()
+
     def train(self):
 
         for c_epoch in range(self.n_epochs):
 
-            one = Variable(torch.ones(1)).to(self.device)
-            zero = Variable(torch.zeros(1)).to(self.device)
+            one = Variable(torch.ones(1), requires_grad=False).to(self.device)
+            zero = Variable(torch.zeros(
+                1), requires_grad=False).to(self.device)
             print('Start epoch {}'.format(c_epoch))
 
             for i, data in enumerate(self.dataloader):
 
-                print(i)
-
                 # Sample from the image folder
-                data_A = Variable(data[1]).to(self.device)  # Painting
-                data_B = Variable(data[0]).to(self.device)  # Image
+                data_A = Variable(data[0]).to(self.device)  # Painting
+                data_B = Variable(data[1]).to(self.device)  # Image
 
-                # Train Generator
-
-                self.gen_ab_optim.zero_grad()
-                self.gen_ba_optim.zero_grad()
+                # -------------------------------------Train Generator
+                self.gen_optim.zero_grad()
 
                 # 1st loss: identity
                 fake_AA = self.gen_ba(data_A)
@@ -83,20 +81,16 @@ class Trainer():
                 dp_loss_BAB = self.double_pass_loss(fake_BAB, data_B)
 
                 # Final loss
-                L_g = id_loss_A + id_loss_B + disc_loss_AB + \
-                    disc_loss_BA + dp_loss_ABA + dp_loss_BAB
+                L_g = 5*id_loss_A + 5*id_loss_B + disc_loss_AB + \
+                    disc_loss_BA + 10*dp_loss_ABA + 10*dp_loss_BAB
                 L_g.backward()
 
-                self.gen_ab_optim.step()
-                self.gen_ba_optim.step()
+                self.gen_optim.step()
 
-                # Train Discriminator
-
-                self.dis_a_optim.zero_grad()
-                self.dis_b_optim.zero_grad()
+                # ------------------------------------ Train Discriminator
+                self.dis_optim.zero_grad()
 
                 # Sample prediction
-
                 real_prediction_A = self.dis_a(data_A)
                 real_loss_A = self.discriminator_loss(real_prediction_A, one)
 
@@ -104,22 +98,28 @@ class Trainer():
                 real_loss_B = self.discriminator_loss(real_prediction_B, one)
 
                 # Fake prediction
-
                 fake_prediction_A = self.dis_a(fake_BA.detach())
                 fake_prediction_B = self.dis_b(fake_AB.detach())
 
                 fake_loss_A = self.discriminator_loss(fake_prediction_A, zero)
                 fake_loss_B = self.discriminator_loss(fake_prediction_B, zero)
 
-                L_D = real_loss_A + real_loss_B + fake_loss_A + fake_loss_B
+                L_D = (real_loss_A + real_loss_B +
+                       fake_loss_A + fake_loss_B)*0.5
                 L_D.backward()
 
-                self.dis_a_optim.step()
-                self.dis_b_optim.step()
+                self.dis_optim.step()
 
-                print('Gen Loss: {} Dis Loss: {}'.format(L_g, L_D))
-
-                save_image(torch.cat((data_A, fake_AB), dim=3),
-                           'log/img{}_AB.png'.format(i))
-                save_image(torch.cat((data_B, fake_BA), dim=3),
-                           'log/img{}_BA.png'.format(i))
+                # Logs : add the loss output
+                self.log.update([
+                    id_loss_A,
+                    disc_loss_AB,
+                    dp_loss_ABA,
+                    id_loss_B,
+                    disc_loss_BA,
+                    dp_loss_BAB,
+                    real_loss_A,
+                    real_loss_B,
+                    fake_loss_A,
+                    fake_loss_B
+                ])
